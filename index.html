@@ -3,69 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQM1・2 PS版 配合シミュレーター【完全深掘り版】</title>
+    <title>DQM1・2 PS版 配合ナビ【縦伸びツリー版】</title>
     <style>
         :root {
             --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #475569;
             --target-bg: #38bdf8; --start-bg: #fb7185; --family-text: #f472b6;
         }
-        body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
-        .wrapper { max-width: 1200px; margin: 0 auto; }
+        body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); padding: 15px; margin: 0; }
+        .wrapper { max-width: 900px; margin: 0 auto; }
         header { text-align: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
-        .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .card { background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--accent); }
-        select, button { width: 100%; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; font-size: 16px; }
-        button { background: var(--accent); color: #0f172a; border: none; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #7dd3fc; transform: translateY(-2px); }
+        select, button { width: 100%; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; font-size: 16px; box-sizing: border-box; }
+        button { background: var(--accent); color: #0f172a; border: none; cursor: pointer; }
 
-        /* --- 家系図（横方向展開） --- */
-        .tree-container { overflow-x: auto; padding: 50px; background: #000; border-radius: 8px; border: 1px solid var(--accent); min-height: 400px; }
-        .tree ul { display: flex; flex-direction: column; padding-left: 60px; list-style: none; margin: 0; }
-        .tree li { display: flex; align-items: center; position: relative; padding: 12px 0; }
+        /* --- 縦方向の家系図 --- */
+        .tree-container { background: #000; border-radius: 8px; border: 1px solid var(--accent); padding: 20px 10px; }
+        .tree { display: flex; justify-content: center; }
+        .tree ul { padding-top: 20px; position: relative; transition: all 0.5s; display: flex; justify-content: center; list-style: none; margin: 0; padding-left: 0; }
+        .tree li { float: left; text-align: center; list-style-type: none; position: relative; padding: 20px 5px 0 5px; transition: all 0.5s; }
 
-        /* つなぎ線の描画 */
-        .tree li::before { content: ""; position: absolute; left: 0; top: 50%; border-top: 2px solid var(--border); width: 40px; }
-        .tree li::after { content: ""; position: absolute; left: 0; border-left: 2px solid var(--border); height: 100%; top: 0; }
-        .tree li:first-child::after { height: 50%; top: 50%; }
-        .tree li:last-child::after { height: 50%; bottom: 50%; top: auto; }
-        .tree li:only-child::after { display: none; }
+        /* 縦線の描画（親から上へ） */
+        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--border); width: 50%; height: 20px; }
+        .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--border); }
+        .tree li:only-child::after, .tree li:only-child::before { display: none; }
+        .tree li:only-child { padding-top: 0; }
+        .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
+        .tree li:last-child::before { border-right: 2px solid var(--border); border-radius: 0 5px 0 0; }
+        .tree li:first-child::after { border-radius: 5px 0 0 0; }
 
-        .monster-wrapper { position: relative; display: flex; align-items: center; z-index: 10; }
-        .has-children > .monster-wrapper::after { content: ""; position: absolute; right: -40px; top: 50%; border-top: 2px solid var(--border); width: 40px; }
+        /* 子供から下へ伸びる線 */
+        .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--border); width: 0; height: 20px; }
 
-        /* モンスターノード */
+        /* モンスターの箱 */
+        .monster-wrapper { position: relative; display: inline-block; }
         .node {
-            display: inline-block; padding: 10px 18px; border-radius: 8px;
+            display: block; padding: 8px 12px; border-radius: 6px;
             background: var(--card); border: 2px solid var(--border);
             font-weight: bold; cursor: pointer; white-space: nowrap; transition: 0.2s;
+            font-size: 12px;
+            z-index: 10; position: relative;
         }
-        .node:hover { border-color: var(--accent); background: #334155; transform: scale(1.05); }
-        .node.expanded { border-color: var(--accent); box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); }
+        .node:hover { border-color: var(--accent); background: #334155; }
         .node.target { background: var(--target-bg); color: #000; border-color: #fff; }
         .node.start { background: var(--start-bg); color: #000; border-color: #fff; }
-        .node.family { color: var(--family-text); cursor: default; border-style: dotted; background: #111827; pointer-events: none; }
+        .node.family { color: var(--family-text); cursor: default; border-style: dotted; pointer-events: none; }
 
-        /* ルート切り替え */
-        .switcher { margin-left: 12px; display: flex; gap: 4px; }
-        .r-btn { font-size: 11px; padding: 3px 8px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
-        .r-btn.active { background: var(--accent); color: #000; font-weight: bold; }
+        /* レシピ切替（箱のすぐ下に配置） */
+        .switcher { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
+        .r-btn { font-size: 9px; padding: 2px 4px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 3px; }
+        .r-btn.active { background: var(--accent); color: #000; }
         
-        .hint { font-size: 0.9em; color: #94a3b8; text-align: center; margin-bottom: 10px; font-style: italic; }
+        .hint { font-size: 0.85em; color: #94a3b8; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 <div class="wrapper">
-    <header><h1>👾 DQM1・2 PS版 完全配合ナビ</h1></header>
+    <header><h1>👾 DQM1・2 PS版 配合ナビ</h1></header>
     <div class="card">
-        <label>1. 目標モンスターを選択</label>
+        <label>目標</label>
         <select id="familySelect" onchange="updateTargetList()"></select>
         <select id="targetSelect" disabled onchange="resetAndGenerate()"></select>
-        
-        <label>2. 手持ちから開始 (任意)</label>
+        <label>手持ち(任意)</label>
         <select id="startSelect" disabled onchange="generateTree()"></select>
-
-        <div class="hint">※名前をクリックして親を展開（系統配合まで遡れます）</div>
-        <button onclick="fullReset()">展開状態を全てリセット</button>
+        <button onclick="fullReset()">開閉リセット</button>
     </div>
     <div id="resultCard" class="card" style="display:none;">
         <div class="tree-container">
@@ -84,49 +85,36 @@ let expandedNodes = new Set();
 async function loadData() {
     try {
         const [resFam, resFus, resMix] = await Promise.all([
-            fetch('family_list.json'),
-            fetch('fusion_list.json'),
-            fetch('family_mixing.json')
+            fetch('family_list.json'), fetch('fusion_list.json'), fetch('family_mixing.json')
         ]);
-
         monsterFamilies = await resFam.json();
         fusionRecipes = await resFus.json();
         familyMixMap = await resMix.json();
 
-        // --- 系統配合（JSON）をレシピに注入 ---
         for (let f1 in familyMixMap) {
             for (let f2 in familyMixMap[f1]) {
                 let resultName = familyMixMap[f1][f2];
-                // 特殊レシピがない場合のみ、系統配合をデフォルトレシピとして追加
                 if (!fusionRecipes.recipes[resultName]) {
                     fusionRecipes.recipes[resultName] = [[f1, f2]];
                 }
             }
         }
-
         const fSel = document.getElementById('familySelect');
         fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
         Object.keys(monsterFamilies).sort().forEach(f => fSel.add(new Option(f, f)));
-    } catch (e) {
-        alert("JSONデータの読み取りに失敗しました。ファイルが同階層にあるか確認してください。");
-        console.error(e);
-    }
+    } catch (e) { alert("JSONロード失敗"); }
 }
 
 function updateTargetList() {
     const tSel = document.getElementById('targetSelect');
     const f = document.getElementById('familySelect').value;
     tSel.innerHTML = '<option value="">-- モンスターを選択 --</option>';
-    if (f) {
-        monsterFamilies[f].sort().forEach(m => tSel.add(new Option(m, m)));
-        tSel.disabled = false;
-    }
+    if (f) { monsterFamilies[f].sort().forEach(m => tSel.add(new Option(m, m))); tSel.disabled = false; }
     updateStartList();
 }
 
 function resetAndGenerate() {
-    selectedRecipeIndices = {}; 
-    expandedNodes = new Set();
+    selectedRecipeIndices = {}; expandedNodes = new Set();
     const target = document.getElementById('targetSelect').value;
     if(target) expandedNodes.add(target);
     updateStartList();
@@ -145,7 +133,6 @@ function updateStartList() {
     const target = document.getElementById('targetSelect').value;
     sSel.innerHTML = '<option value="">-- 最初から計算 --</option>';
     if (!target) { sSel.disabled = true; return; }
-    
     const related = new Set();
     const q = [target];
     const visited = new Set();
@@ -154,9 +141,7 @@ function updateStartList() {
         if (visited.has(cur)) continue; visited.add(cur);
         const routes = fusionRecipes.recipes[cur];
         if (!routes) continue;
-        routes.forEach(route => route.forEach(p => { 
-            if (!monsterFamilies[p]) { related.add(p); q.push(p); } 
-        }));
+        routes.forEach(route => route.forEach(p => { if (!monsterFamilies[p]) { related.add(p); q.push(p); } }));
     }
     Array.from(related).sort().forEach(m => sSel.add(new Option(m, m)));
     sSel.disabled = false;
@@ -183,21 +168,17 @@ function buildTreeHTML(name, isTarget = false) {
     
     let nodeClass = 'node';
     if (isTarget) nodeClass += ' target';
-    if (isExpanded) nodeClass += ' expanded';
     if (isFamily) nodeClass += ' family';
     if (name === start && start !== "") nodeClass += ' start';
 
-    // 系統名、または「手持ち指定」された個体はクリック不可（展開終了）
     const canToggle = !isFamily && (name !== start || start === "");
-    const clickHandler = canToggle ? `onclick="toggleNode('${name}')"` : '';
+    const clickAttr = canToggle ? `onclick="toggleNode('${name}')"` : '';
 
-    let html = `<li class="${isExpanded && routes && canToggle ? 'has-children' : ''}"><div class="monster-wrapper">`;
-    html += `<span class="${nodeClass}" ${clickHandler}>${name}</span>`;
+    let html = `<li><div class="monster-wrapper">`;
+    html += `<span class="${nodeClass}" ${clickAttr}>${name}</span>`;
 
-    // 手持ち指定されたモンスターはそこで止まる
     if (name === start && start !== "") {
-        html += `</div></li>`;
-        return html;
+        html += `</div></li>`; return html;
     }
 
     if (!isFamily && routes) {
@@ -209,18 +190,13 @@ function buildTreeHTML(name, isTarget = false) {
             });
             html += `</div>`;
         }
-        
         if (isExpanded && canToggle) {
             html += `</div><ul>`;
             html += buildTreeHTML(routes[idx][0]);
             html += buildTreeHTML(routes[idx][1]);
             html += `</ul>`;
-        } else {
-            html += `</div>`;
-        }
-    } else {
-        html += `</div>`;
-    }
+        } else { html += `</div>`; }
+    } else { html += `</div>`; }
     html += `</li>`;
     return html;
 }
