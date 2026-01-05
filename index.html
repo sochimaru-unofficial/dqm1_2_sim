@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQM1・2 PS版 配合ナビ【系統終端版】</title>
+    <title>DQM1・2 PS版 配合ナビ【完全深掘り版】</title>
     <style>
         :root {
             --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #475569;
@@ -15,45 +15,49 @@
         select, button { width: 100%; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; }
         button { background: var(--accent); color: #0f172a; border: none; cursor: pointer; }
 
-        .tree-container { overflow-x: auto; padding: 20px; background: #000; border-radius: 8px; border: 1px solid var(--accent); min-height: 200px; }
-        .tree ul { display: flex; flex-direction: column; padding-left: 40px; list-style: none; margin: 0; }
-        .tree li { display: flex; align-items: center; position: relative; padding: 8px 0; }
+        .tree-container { overflow-x: auto; padding: 40px; background: #000; border-radius: 8px; border: 1px solid var(--accent); min-height: 300px; }
+        .tree ul { display: flex; flex-direction: column; padding-left: 50px; list-style: none; margin: 0; }
+        .tree li { display: flex; align-items: center; position: relative; padding: 10px 0; }
 
-        /* 線を描画 */
-        .tree li::before { content: ""; position: absolute; left: 0; top: 50%; border-top: 2px solid var(--border); width: 20px; }
+        .tree li::before { content: ""; position: absolute; left: 0; top: 50%; border-top: 2px solid var(--border); width: 30px; }
         .tree li::after { content: ""; position: absolute; left: 0; border-left: 2px solid var(--border); height: 100%; top: 0; }
         .tree li:first-child::after { height: 50%; top: 50%; }
         .tree li:last-child::after { height: 50%; bottom: 50%; top: auto; }
         .tree li:only-child::after { display: none; }
 
         .monster-wrapper { position: relative; display: flex; align-items: center; z-index: 10; }
-        .has-children > .monster-wrapper::after { content: ""; position: absolute; right: -20px; top: 50%; border-top: 2px solid var(--border); width: 20px; }
+        .has-children > .monster-wrapper::after { content: ""; position: absolute; right: -30px; top: 50%; border-top: 2px solid var(--border); width: 30px; }
 
         .node {
-            display: inline-block; padding: 6px 14px; border-radius: 6px;
+            display: inline-block; padding: 8px 16px; border-radius: 8px;
             background: var(--card); border: 2px solid var(--border);
             font-weight: bold; cursor: pointer; white-space: nowrap; transition: 0.2s;
         }
-        .node:hover { border-color: var(--accent); background: #334155; }
-        .node.expanded { border-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
+        .node:hover { border-color: var(--accent); background: #334155; transform: scale(1.05); }
+        .node.expanded { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); }
         .node.target { background: var(--target-bg); color: #000; }
-        .node.family { color: var(--family-text); cursor: default; border-style: dotted; background: #1e293b; }
+        .node.start { background: var(--start-bg); color: #000; border-color: #fca5a5; }
+        .node.family { color: var(--family-text); cursor: default; border-style: dotted; background: #1e293b; pointer-events: none; }
 
-        .switcher { margin-left: 8px; display: flex; gap: 3px; }
-        .r-btn { font-size: 10px; padding: 2px 5px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 3px; }
+        .switcher { margin-left: 10px; display: flex; gap: 4px; }
+        .r-btn { font-size: 11px; padding: 3px 6px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
         .r-btn.active { background: var(--accent); color: #000; }
         
-        .hint { font-size: 0.8em; color: #94a3b8; text-align: center; margin-bottom: 10px; }
+        .hint { font-size: 0.85em; color: #94a3b8; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 <div class="wrapper">
     <div class="card">
-        <label>目標モンスターを選択</label>
+        <label>1. 目標モンスター</label>
         <select id="familySelect" onchange="updateTargetList()"></select>
         <select id="targetSelect" disabled onchange="resetAndGenerate()"></select>
-        <div class="hint">※名前をクリックして親を展開（系統名で止まります）</div>
-        <button onclick="generateTree()">全体リセット</button>
+        
+        <label>2. 手持ちモンスターから開始 (任意)</label>
+        <select id="startSelect" disabled onchange="generateTree()"></select>
+
+        <div class="hint">※モンスター名をクリックして親を展開（系統同士の配合になるまで深掘り可能）</div>
+        <button onclick="fullReset()">全ての開閉をリセット</button>
     </div>
     <div id="resultCard" class="card" style="display:none;">
         <div class="tree-container"><div id="output" class="tree"></div></div>
@@ -71,6 +75,7 @@ async function loadData() {
     const resFus = await fetch('fusion_list.json');
     monsterFamilies = await resFam.json();
     fusionRecipes = await resFus.json();
+    
     const fSel = document.getElementById('familySelect');
     fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
     Object.keys(monsterFamilies).sort().forEach(f => fSel.add(new Option(f, f)));
@@ -81,6 +86,7 @@ function updateTargetList() {
     const f = document.getElementById('familySelect').value;
     tSel.innerHTML = '<option value="">-- モンスターを選択 --</option>';
     if (f) { monsterFamilies[f].sort().forEach(m => tSel.add(new Option(m, m))); tSel.disabled = false; }
+    updateStartList();
 }
 
 function resetAndGenerate() {
@@ -88,16 +94,43 @@ function resetAndGenerate() {
     expandedNodes = new Set();
     const target = document.getElementById('targetSelect').value;
     if(target) expandedNodes.add(target);
+    updateStartList();
     generateTree();
 }
 
-function toggleNode(name) {
-    if (monsterFamilies[name]) return; // 系統名はクリックしても展開させない
-    if (expandedNodes.has(name)) {
-        expandedNodes.delete(name);
-    } else {
-        expandedNodes.add(name);
+function fullReset() {
+    expandedNodes = new Set();
+    const target = document.getElementById('targetSelect').value;
+    if(target) expandedNodes.add(target);
+    generateTree();
+}
+
+function updateStartList() {
+    const sSel = document.getElementById('startSelect');
+    const target = document.getElementById('targetSelect').value;
+    sSel.innerHTML = '<option value="">-- 最初から計算 --</option>';
+    if (!target) { sSel.disabled = true; return; }
+    
+    const related = new Set();
+    const q = [target];
+    const visited = new Set();
+    while(q.length > 0) {
+        const cur = q.shift();
+        if (visited.has(cur)) continue; visited.add(cur);
+        const routes = fusionRecipes.recipes[cur];
+        if (!routes) continue;
+        routes.forEach(route => route.forEach(p => { 
+            if (!monsterFamilies[p]) { related.add(p); q.push(p); } 
+        }));
     }
+    Array.from(related).sort().forEach(m => sSel.add(new Option(m, m)));
+    sSel.disabled = false;
+}
+
+function toggleNode(name) {
+    if (monsterFamilies[name]) return; 
+    if (expandedNodes.has(name)) expandedNodes.delete(name);
+    else expandedNodes.add(name);
     generateTree();
 }
 
@@ -108,6 +141,7 @@ function switchR(event, name, idx) {
 }
 
 function buildTreeHTML(name, isTarget = false) {
+    const start = document.getElementById('startSelect').value;
     const isFamily = !!monsterFamilies[name];
     const isExpanded = expandedNodes.has(name);
     const routes = fusionRecipes.recipes[name];
@@ -116,14 +150,19 @@ function buildTreeHTML(name, isTarget = false) {
     if (isTarget) nodeClass += ' target';
     if (isExpanded) nodeClass += ' expanded';
     if (isFamily) nodeClass += ' family';
+    if (name === start && start !== "") nodeClass += ' start';
 
-    // 系統名の場合はクリックイベントを付けない
-    const clickHandler = isFamily ? '' : `onclick="toggleNode('${name}')"`;
+    const clickHandler = (isFamily || (name === start && start !== "")) ? '' : `onclick="toggleNode('${name}')"`;
 
     let html = `<li class="${isExpanded && routes ? 'has-children' : ''}"><div class="monster-wrapper">`;
     html += `<span class="${nodeClass}" ${clickHandler}>${name}</span>`;
 
-    // モンスターかつレシピがある場合
+    // 手持ちモンスター、または系統名の場合はそこで展開を止める
+    if (name === start && start !== "") {
+        html += `</div></li>`;
+        return html;
+    }
+
     if (!isFamily && routes) {
         const idx = selectedRecipeIndices[name] || 0;
         if (routes.length > 1) {
