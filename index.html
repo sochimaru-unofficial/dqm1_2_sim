@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQM1・2 PS版 配合シミュレーター【ルート選択機能】</title>
+    <title>DQM1・2 PS版 配合ナビ【クリックジャンプ機能】</title>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #334155; --parent-color: #38bdf8; --child-color: #f8fafc; --start-color: #fb7185; --family-list-color: #f472b6; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #475569; --parent-color: #38bdf8; --child-color: #f8fafc; --start-color: #fb7185; --family-list-color: #f472b6; }
         body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.6; }
         .wrapper { max-width: 1100px; margin: 0 auto; }
         header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
@@ -24,28 +24,33 @@
         .genealogy-tree li::after { content: ''; position: absolute; top: 15px; left: 0; border-top: 1px dashed var(--border); width: 20px; height: 1px; }
         .genealogy-tree > ul > li::before, .genealogy-tree > ul > li::after { display: none; }
         
-        .monster-node { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-weight: bold; color: var(--child-color); white-space: nowrap; }
+        /* モンスター名（クリック可能） */
+        .monster-node { 
+            display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 6px; 
+            padding: 5px 12px; font-weight: bold; color: var(--child-color); white-space: nowrap; 
+            cursor: pointer; transition: 0.2s;
+        }
+        .monster-node:hover { background: #334155; border-color: var(--accent); }
         .monster-node.target { background: var(--parent-color); color: var(--bg); border-color: var(--accent); }
         .monster-node.start { background: var(--start-color); color: var(--bg); border-color: var(--start-color); }
-        .monster-node.family-type { color: var(--family-list-color); background: #2f3e4e; }
+        .monster-node.family-type { color: var(--family-list-color); background: #2f3e4e; cursor: default; } /* 系統名はクリック不可 */
 
-        /* ルート切替ボタン */
         .recipe-switcher { display: inline-flex; gap: 4px; margin-left: 10px; vertical-align: middle; }
-        .route-btn { background: #334155; color: #94a3b8; border: 1px solid var(--border); padding: 2px 6px; font-size: 10px; border-radius: 4px; cursor: pointer; }
-        .route-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: bold; }
+        .route-btn { background: #1e293b; color: #94a3b8; border: 1px solid var(--border); padding: 2px 6px; font-size: 10px; border-radius: 4px; cursor: pointer; }
+        .route-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
         
-        .summary-section, .family-list-section { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); }
+        .summary-section { margin-top: 25px; color: #fbbf24; }
     </style>
 </head>
 <body>
     <div class="wrapper">
-        <header><h1>👾 DQM1・2 PS版 配合ナビ【ルート切替版】</h1></header>
+        <header><h1>👾 DQM1・2 PS版 配合ナビ【クリック深掘り版】</h1></header>
         <div class="card">
-            <label>1. 系統</label>
+            <label>1. 系統を選択</label>
             <select id="familySelect" onchange="updateTargetList()"></select>
-            <label>2. モンスター</label>
+            <label>2. 目標モンスターを選択</label>
             <select id="targetSelect" disabled onchange="resetAndStartList()"></select>
-            <label>3. 手持ち (任意)</label>
+            <label>3. 手持ちモンスターから開始 (任意)</label>
             <select id="startSelect" disabled></select>
             <button onclick="generateTree()">家系図を生成</button>
         </div>
@@ -55,7 +60,7 @@
 <script>
 let monsterFamilies = {};
 let fusionRecipes = {};
-let selectedRecipeIndices = {}; // モンスター名ごとの選択レシピ番号を保持
+let selectedRecipeIndices = {}; 
 
 async function loadData() {
     try {
@@ -66,7 +71,7 @@ async function loadData() {
         const fSel = document.getElementById('familySelect');
         fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
         Object.keys(monsterFamilies).sort().forEach(f => fSel.add(new Option(f, f)));
-    } catch (e) { console.error("Data Load Error", e); }
+    } catch (e) { alert("JSONの読み込みに失敗しました。"); }
 }
 
 function updateTargetList() {
@@ -78,7 +83,7 @@ function updateTargetList() {
 }
 
 function resetAndStartList() {
-    selectedRecipeIndices = {}; // 新しいモンスターを選んだらレシピ選択をリセット
+    selectedRecipeIndices = {}; 
     updateStartList();
 }
 
@@ -103,10 +108,28 @@ function updateStartList() {
     sSel.disabled = false;
 }
 
-// レシピを切り替えて再描画する関数
-function switchRecipe(monsterName, index) {
+// 家系図内のモンスターをクリックした時の処理
+function jumpToMonster(monsterName) {
+    if (monsterFamilies[monsterName]) return; // 系統名なら何もしない
+
+    // そのモンスターが属する系統を探す
+    for (let f in monsterFamilies) {
+        if (monsterFamilies[f].includes(monsterName)) {
+            document.getElementById('familySelect').value = f;
+            updateTargetList();
+            document.getElementById('targetSelect').value = monsterName;
+            resetAndStartList();
+            generateTree();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+    }
+}
+
+function switchRecipe(event, monsterName, index) {
+    event.stopPropagation(); // 親要素のクリックイベント（ジャンプ）を防止
     selectedRecipeIndices[monsterName] = index;
-    generateTree(); // 再描画
+    generateTree();
 }
 
 function generateTree() {
@@ -117,45 +140,45 @@ function generateTree() {
     document.getElementById('resultCard').style.display = 'block';
 
     let summary = {};
-    let activeFamilies = new Set();
 
     function build(name, isTarget = false) {
         let nodeClass = 'monster-node';
         if (isTarget) nodeClass += ' target';
         if (name === start && start !== "") nodeClass += ' start';
-        if (monsterFamilies[name]) nodeClass += ' family-type';
+        
+        const isFamily = !!monsterFamilies[name];
+        if (isFamily) nodeClass += ' family-type';
 
-        // 終端判定
-        if ((name === start && start !== "") || !fusionRecipes.recipes[name] || monsterFamilies[name]) {
-            if (!monsterFamilies[name] && name !== start) {
-                summary[name] = (summary[name] || 0) + 1;
-                for(let f in monsterFamilies) if(monsterFamilies[f].includes(name)) activeFamilies.add(f);
-            } else if (monsterFamilies[name]) activeFamilies.add(name);
-            return `<li><span class="${nodeClass}">${name}</span></li>`;
+        const onClickAttr = isFamily ? '' : `onclick="jumpToMonster('${name}')"`;
+
+        // 終端：手持ち、レシピなし、または系統名
+        if ((name === start && start !== "") || !fusionRecipes.recipes[name] || isFamily) {
+            if (!isFamily && name !== start) summary[name] = (summary[name] || 0) + 1;
+            return `<li><span class="${nodeClass}" ${onClickAttr}>${name}</span></li>`;
         }
 
         const routes = fusionRecipes.recipes[name];
         const currentIndex = selectedRecipeIndices[name] || 0;
         const [p1, p2] = routes[currentIndex];
 
-        // ルート切替ボタンの生成
         let buttons = '';
         if (routes.length > 1) {
             buttons = `<span class="recipe-switcher">`;
             routes.forEach((_, i) => {
                 const active = i === currentIndex ? 'active' : '';
-                buttons += `<button class="route-btn ${active}" onclick="switchRecipe('${name}', ${i})">ルート${i+1}</button>`;
+                buttons += `<button class="route-btn ${active}" onclick="switchRecipe(event, '${name}', ${i})">R${i+1}</button>`;
             });
             buttons += `</span>`;
         }
 
-        return `<li><span class="${nodeClass}">${name}</span>${buttons}<ul>${build(p1)}${build(p2)}</ul></li>`;
+        return `<li><span class="${nodeClass}" ${onClickAttr}>${name}</span>${buttons}<ul>${build(p1)}${build(p2)}</ul></li>`;
     }
 
-    let html = `<div class="genealogy-tree"><ul>${build(target, true)}</ul></div>`;
-    // 素材集計と系統リストは省略せず表示（ロジックは前回同様）
-    output.innerHTML = html; 
-    // ※実際にはここにsummaryHTMLとfamilyListHTMLを結合します
+    let treeHTML = `<div class="genealogy-tree"><ul>${build(target, true)}</ul></div>`;
+    let sumHTML = `<div class="summary-section"><b>【必要素材合計】</b>\n` + 
+                  Object.entries(summary).map(([m, c]) => `${m} × ${c}`).join("\n") + `</div>`;
+
+    output.innerHTML = treeHTML + sumHTML;
 }
 
 loadData();
