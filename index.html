@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQM1・2 PS版 配合ナビ【縦伸びツリー版】</title>
+    <title>DQM1・2 PS版 配合ナビ【完全版】</title>
     <style>
         :root {
             --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #475569;
@@ -11,19 +11,17 @@
         }
         body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); padding: 15px; margin: 0; }
         .wrapper { max-width: 900px; margin: 0 auto; }
-        header { text-align: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
         .card { background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--accent); }
         select, button { width: 100%; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; font-size: 16px; box-sizing: border-box; }
         button { background: var(--accent); color: #0f172a; border: none; cursor: pointer; }
 
         /* --- 縦方向の家系図 --- */
-        .tree-container { background: #000; border-radius: 8px; border: 1px solid var(--accent); padding: 20px 10px; }
+        .tree-container { background: #000; border-radius: 8px; border: 1px solid var(--accent); padding: 20px 5px; overflow-x: auto; }
         .tree { display: flex; justify-content: center; }
-        .tree ul { padding-top: 20px; position: relative; transition: all 0.5s; display: flex; justify-content: center; list-style: none; margin: 0; padding-left: 0; }
-        .tree li { float: left; text-align: center; list-style-type: none; position: relative; padding: 20px 5px 0 5px; transition: all 0.5s; }
+        .tree ul { padding-top: 20px; position: relative; display: flex; justify-content: center; list-style: none; margin: 0; padding-left: 0; }
+        .tree li { float: left; text-align: center; list-style-type: none; position: relative; padding: 20px 5px 0 5px; }
 
-        /* 縦線の描画（親から上へ） */
+        /* 線の描画 */
         .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--border); width: 50%; height: 20px; }
         .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--border); }
         .tree li:only-child::after, .tree li:only-child::before { display: none; }
@@ -31,47 +29,46 @@
         .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
         .tree li:last-child::before { border-right: 2px solid var(--border); border-radius: 0 5px 0 0; }
         .tree li:first-child::after { border-radius: 5px 0 0 0; }
-
-        /* 子供から下へ伸びる線 */
         .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--border); width: 0; height: 20px; }
 
         /* モンスターの箱 */
         .monster-wrapper { position: relative; display: inline-block; }
         .node {
-            display: block; padding: 8px 12px; border-radius: 6px;
+            display: block; padding: 8px 10px; border-radius: 6px;
             background: var(--card); border: 2px solid var(--border);
             font-weight: bold; cursor: pointer; white-space: nowrap; transition: 0.2s;
-            font-size: 12px;
-            z-index: 10; position: relative;
+            font-size: 13px; z-index: 10; position: relative;
         }
-        .node:hover { border-color: var(--accent); background: #334155; }
-        .node.target { background: var(--target-bg); color: #000; border-color: #fff; }
-        .node.start { background: var(--start-bg); color: #000; border-color: #fff; }
-        .node.family { color: var(--family-text); cursor: default; border-style: dotted; pointer-events: none; }
+        /* 開閉マーク */
+        .node.can-expand::before { content: '[+] '; color: var(--accent); font-family: monospace; }
+        .node.expanded::before { content: '[-] '; color: var(--start-bg); }
 
-        /* レシピ切替（箱のすぐ下に配置） */
+        .node:hover { border-color: var(--accent); background: #334155; }
+        .node.target { background: var(--target-bg); color: #000; }
+        .node.start { background: var(--start-bg); color: #000; }
+        .node.family { color: var(--family-text); cursor: default; border-style: dotted; pointer-events: none; }
+        .node.family::before { content: '' !important; }
+
+        /* プラス値表示 */
+        .plus-req { font-size: 10px; color: #fbbf24; display: block; margin-top: 2px; font-weight: normal; }
+
         .switcher { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
         .r-btn { font-size: 9px; padding: 2px 4px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 3px; }
         .r-btn.active { background: var(--accent); color: #000; }
-        
-        .hint { font-size: 0.85em; color: #94a3b8; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 <div class="wrapper">
-    <header><h1>👾 DQM1・2 PS版 配合ナビ</h1></header>
     <div class="card">
-        <label>目標</label>
+        <label>目標モンスター</label>
         <select id="familySelect" onchange="updateTargetList()"></select>
         <select id="targetSelect" disabled onchange="resetAndGenerate()"></select>
-        <label>手持ち(任意)</label>
+        <label>手持ちから開始 (任意)</label>
         <select id="startSelect" disabled onchange="generateTree()"></select>
-        <button onclick="fullReset()">開閉リセット</button>
+        <button onclick="fullReset()">全ての開閉を閉じる</button>
     </div>
     <div id="resultCard" class="card" style="display:none;">
-        <div class="tree-container">
-            <div id="output" class="tree"></div>
-        </div>
+        <div class="tree-container"><div id="output" class="tree"></div></div>
     </div>
 </div>
 
@@ -93,16 +90,16 @@ async function loadData() {
 
         for (let f1 in familyMixMap) {
             for (let f2 in familyMixMap[f1]) {
-                let resultName = familyMixMap[f1][f2];
-                if (!fusionRecipes.recipes[resultName]) {
-                    fusionRecipes.recipes[resultName] = [[f1, f2]];
+                let resName = familyMixMap[f1][f2];
+                if (!fusionRecipes.recipes[resName]) {
+                    fusionRecipes.recipes[resName] = [[f1, f2]];
                 }
             }
         }
         const fSel = document.getElementById('familySelect');
         fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
         Object.keys(monsterFamilies).sort().forEach(f => fSel.add(new Option(f, f)));
-    } catch (e) { alert("JSONロード失敗"); }
+    } catch (e) { alert("JSON読み込み失敗"); }
 }
 
 function updateTargetList() {
@@ -154,12 +151,6 @@ function toggleNode(name) {
     generateTree();
 }
 
-function switchR(event, name, idx) {
-    event.stopPropagation();
-    selectedRecipeIndices[name] = idx;
-    generateTree();
-}
-
 function buildTreeHTML(name, isTarget = false) {
     const start = document.getElementById('startSelect').value;
     const isFamily = !!monsterFamilies[name];
@@ -170,6 +161,8 @@ function buildTreeHTML(name, isTarget = false) {
     if (isTarget) nodeClass += ' target';
     if (isFamily) nodeClass += ' family';
     if (name === start && start !== "") nodeClass += ' start';
+    if (routes && !isFamily) nodeClass += ' can-expand';
+    if (isExpanded) nodeClass += ' expanded';
 
     const canToggle = !isFamily && (name !== start || start === "");
     const clickAttr = canToggle ? `onclick="toggleNode('${name}')"` : '';
@@ -183,17 +176,24 @@ function buildTreeHTML(name, isTarget = false) {
 
     if (!isFamily && routes) {
         const idx = selectedRecipeIndices[name] || 0;
+        const currentRecipe = routes[idx];
+        
+        // プラス値の条件があれば表示
+        if (currentRecipe[2]) {
+            html += `<span class="plus-req">${currentRecipe[2]}</span>`;
+        }
+
         if (routes.length > 1) {
             html += `<div class="switcher">`;
             routes.forEach((_, i) => {
-                html += `<button class="r-btn ${i === idx ? 'active' : ''}" onclick="switchR(event,'${name}',${i})">R${i+1}</button>`;
+                html += `<button class="r-btn ${i === idx ? 'active' : ''}" onclick="event.stopPropagation(); selectedRecipeIndices['${name}']=${i}; generateTree();">R${i+1}</button>`;
             });
             html += `</div>`;
         }
         if (isExpanded && canToggle) {
             html += `</div><ul>`;
-            html += buildTreeHTML(routes[idx][0]);
-            html += buildTreeHTML(routes[idx][1]);
+            html += buildTreeHTML(currentRecipe[0]);
+            html += buildTreeHTML(currentRecipe[1]);
             html += `</ul>`;
         } else { html += `</div>`; }
     } else { html += `</div>`; }
