@@ -3,89 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQM1・2 PS版 配合ナビ【完全深掘り版】</title>
+    <title>DQM1・2 PS版 配合シミュレーター【完全深掘り版】</title>
     <style>
         :root {
             --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #475569;
             --target-bg: #38bdf8; --start-bg: #fb7185; --family-text: #f472b6;
         }
-        body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+        body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
         .wrapper { max-width: 1200px; margin: 0 auto; }
+        header { text-align: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
         .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
-        select, button { width: 100%; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; }
-        button { background: var(--accent); color: #0f172a; border: none; cursor: pointer; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--accent); }
+        select, button { width: 100%; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; font-size: 16px; }
+        button { background: var(--accent); color: #0f172a; border: none; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #7dd3fc; transform: translateY(-2px); }
 
-        .tree-container { overflow-x: auto; padding: 40px; background: #000; border-radius: 8px; border: 1px solid var(--accent); min-height: 300px; }
-        .tree ul { display: flex; flex-direction: column; padding-left: 50px; list-style: none; margin: 0; }
-        .tree li { display: flex; align-items: center; position: relative; padding: 10px 0; }
+        /* --- 家系図（横方向展開） --- */
+        .tree-container { overflow-x: auto; padding: 50px; background: #000; border-radius: 8px; border: 1px solid var(--accent); min-height: 400px; }
+        .tree ul { display: flex; flex-direction: column; padding-left: 60px; list-style: none; margin: 0; }
+        .tree li { display: flex; align-items: center; position: relative; padding: 12px 0; }
 
-        .tree li::before { content: ""; position: absolute; left: 0; top: 50%; border-top: 2px solid var(--border); width: 30px; }
+        /* つなぎ線の描画 */
+        .tree li::before { content: ""; position: absolute; left: 0; top: 50%; border-top: 2px solid var(--border); width: 40px; }
         .tree li::after { content: ""; position: absolute; left: 0; border-left: 2px solid var(--border); height: 100%; top: 0; }
         .tree li:first-child::after { height: 50%; top: 50%; }
         .tree li:last-child::after { height: 50%; bottom: 50%; top: auto; }
         .tree li:only-child::after { display: none; }
 
         .monster-wrapper { position: relative; display: flex; align-items: center; z-index: 10; }
-        .has-children > .monster-wrapper::after { content: ""; position: absolute; right: -30px; top: 50%; border-top: 2px solid var(--border); width: 30px; }
+        .has-children > .monster-wrapper::after { content: ""; position: absolute; right: -40px; top: 50%; border-top: 2px solid var(--border); width: 40px; }
 
+        /* モンスターノード */
         .node {
-            display: inline-block; padding: 8px 16px; border-radius: 8px;
+            display: inline-block; padding: 10px 18px; border-radius: 8px;
             background: var(--card); border: 2px solid var(--border);
             font-weight: bold; cursor: pointer; white-space: nowrap; transition: 0.2s;
         }
         .node:hover { border-color: var(--accent); background: #334155; transform: scale(1.05); }
-        .node.expanded { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); }
-        .node.target { background: var(--target-bg); color: #000; }
-        .node.start { background: var(--start-bg); color: #000; border-color: #fca5a5; }
-        .node.family { color: var(--family-text); cursor: default; border-style: dotted; background: #1e293b; pointer-events: none; }
+        .node.expanded { border-color: var(--accent); box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); }
+        .node.target { background: var(--target-bg); color: #000; border-color: #fff; }
+        .node.start { background: var(--start-bg); color: #000; border-color: #fff; }
+        .node.family { color: var(--family-text); cursor: default; border-style: dotted; background: #111827; pointer-events: none; }
 
-        .switcher { margin-left: 10px; display: flex; gap: 4px; }
-        .r-btn { font-size: 11px; padding: 3px 6px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
-        .r-btn.active { background: var(--accent); color: #000; }
+        /* ルート切り替え */
+        .switcher { margin-left: 12px; display: flex; gap: 4px; }
+        .r-btn { font-size: 11px; padding: 3px 8px; background: #1e293b; color: #fff; border: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
+        .r-btn.active { background: var(--accent); color: #000; font-weight: bold; }
         
-        .hint { font-size: 0.85em; color: #94a3b8; text-align: center; margin-bottom: 10px; }
+        .hint { font-size: 0.9em; color: #94a3b8; text-align: center; margin-bottom: 10px; font-style: italic; }
     </style>
 </head>
 <body>
 <div class="wrapper">
+    <header><h1>👾 DQM1・2 PS版 完全配合ナビ</h1></header>
     <div class="card">
-        <label>1. 目標モンスター</label>
+        <label>1. 目標モンスターを選択</label>
         <select id="familySelect" onchange="updateTargetList()"></select>
         <select id="targetSelect" disabled onchange="resetAndGenerate()"></select>
         
-        <label>2. 手持ちモンスターから開始 (任意)</label>
+        <label>2. 手持ちから開始 (任意)</label>
         <select id="startSelect" disabled onchange="generateTree()"></select>
 
-        <div class="hint">※モンスター名をクリックして親を展開（系統同士の配合になるまで深掘り可能）</div>
-        <button onclick="fullReset()">全ての開閉をリセット</button>
+        <div class="hint">※名前をクリックして親を展開（系統配合まで遡れます）</div>
+        <button onclick="fullReset()">展開状態を全てリセット</button>
     </div>
     <div id="resultCard" class="card" style="display:none;">
-        <div class="tree-container"><div id="output" class="tree"></div></div>
+        <div class="tree-container">
+            <div id="output" class="tree"></div>
+        </div>
     </div>
 </div>
 
 <script>
 let monsterFamilies = {};
 let fusionRecipes = {};
+let familyMixMap = {};
 let selectedRecipeIndices = {}; 
 let expandedNodes = new Set(); 
 
 async function loadData() {
-    const resFam = await fetch('family_list.json');
-    const resFus = await fetch('fusion_list.json');
-    monsterFamilies = await resFam.json();
-    fusionRecipes = await resFus.json();
-    
-    const fSel = document.getElementById('familySelect');
-    fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
-    Object.keys(monsterFamilies).sort().forEach(f => fSel.add(new Option(f, f)));
+    try {
+        const [resFam, resFus, resMix] = await Promise.all([
+            fetch('family_list.json'),
+            fetch('fusion_list.json'),
+            fetch('family_mixing.json')
+        ]);
+
+        monsterFamilies = await resFam.json();
+        fusionRecipes = await resFus.json();
+        familyMixMap = await resMix.json();
+
+        // --- 系統配合（JSON）をレシピに注入 ---
+        for (let f1 in familyMixMap) {
+            for (let f2 in familyMixMap[f1]) {
+                let resultName = familyMixMap[f1][f2];
+                // 特殊レシピがない場合のみ、系統配合をデフォルトレシピとして追加
+                if (!fusionRecipes.recipes[resultName]) {
+                    fusionRecipes.recipes[resultName] = [[f1, f2]];
+                }
+            }
+        }
+
+        const fSel = document.getElementById('familySelect');
+        fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
+        Object.keys(monsterFamilies).sort().forEach(f => fSel.add(new Option(f, f)));
+    } catch (e) {
+        alert("JSONデータの読み取りに失敗しました。ファイルが同階層にあるか確認してください。");
+        console.error(e);
+    }
 }
 
 function updateTargetList() {
     const tSel = document.getElementById('targetSelect');
     const f = document.getElementById('familySelect').value;
     tSel.innerHTML = '<option value="">-- モンスターを選択 --</option>';
-    if (f) { monsterFamilies[f].sort().forEach(m => tSel.add(new Option(m, m))); tSel.disabled = false; }
+    if (f) {
+        monsterFamilies[f].sort().forEach(m => tSel.add(new Option(m, m)));
+        tSel.disabled = false;
+    }
     updateStartList();
 }
 
@@ -152,12 +187,14 @@ function buildTreeHTML(name, isTarget = false) {
     if (isFamily) nodeClass += ' family';
     if (name === start && start !== "") nodeClass += ' start';
 
-    const clickHandler = (isFamily || (name === start && start !== "")) ? '' : `onclick="toggleNode('${name}')"`;
+    // 系統名、または「手持ち指定」された個体はクリック不可（展開終了）
+    const canToggle = !isFamily && (name !== start || start === "");
+    const clickHandler = canToggle ? `onclick="toggleNode('${name}')"` : '';
 
-    let html = `<li class="${isExpanded && routes ? 'has-children' : ''}"><div class="monster-wrapper">`;
+    let html = `<li class="${isExpanded && routes && canToggle ? 'has-children' : ''}"><div class="monster-wrapper">`;
     html += `<span class="${nodeClass}" ${clickHandler}>${name}</span>`;
 
-    // 手持ちモンスター、または系統名の場合はそこで展開を止める
+    // 手持ち指定されたモンスターはそこで止まる
     if (name === start && start !== "") {
         html += `</div></li>`;
         return html;
@@ -168,13 +205,12 @@ function buildTreeHTML(name, isTarget = false) {
         if (routes.length > 1) {
             html += `<div class="switcher">`;
             routes.forEach((_, i) => {
-                const active = i === idx ? 'active' : '';
-                html += `<button class="r-btn ${active}" onclick="switchR(event,'${name}',${i})">R${i+1}</button>`;
+                html += `<button class="r-btn ${i === idx ? 'active' : ''}" onclick="switchR(event,'${name}',${i})">R${i+1}</button>`;
             });
             html += `</div>`;
         }
         
-        if (isExpanded) {
+        if (isExpanded && canToggle) {
             html += `</div><ul>`;
             html += buildTreeHTML(routes[idx][0]);
             html += buildTreeHTML(routes[idx][1]);
