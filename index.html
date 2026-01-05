@@ -3,193 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DQM1・2 PS版 配合シミュレーター【完全網羅版】</title>
+    <title>DQM1・2 PS版 配合シミュレーター【完全版】</title>
     <style>
         :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --border: #334155; }
         body { font-family: 'Segoe UI', Meiryo, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.6; }
-        .wrapper { max-width: 1200px; margin: 0 auto; }
+        .wrapper { max-width: 1000px; margin: 0 auto; }
         header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
         .card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--accent); }
         select { width: 100%; padding: 12px; border-radius: 8px; background: #0f172a; color: white; border: 1px solid var(--border); font-size: 16px; margin-bottom: 15px; }
-        button { width: 100%; padding: 15px; background: var(--accent); color: #0f172a; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; }
-        button:hover { opacity: 0.9; }
+        button { width: 100%; padding: 15px; background: var(--accent); color: #0f172a; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #7dd3fc; }
         #output { background: #000; color: #10b981; padding: 20px; border-radius: 8px; font-family: 'Consolas', monospace; white-space: pre; overflow-x: auto; border: 1px solid var(--accent); line-height: 1.4; font-size: 13px; }
-        .family-info { color: #f472b6; font-size: 0.85em; margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px; }
-        .summary-total { color: #fbbf24; font-weight: bold; margin-top: 20px; display: block; }
+        .family-info { color: #f472b6; font-size: 0.9em; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .error { color: #f87171; font-weight: bold; }
     </style>
 </head>
 <body>
-
-<div class="wrapper">
-    <header><h1>👾 DQM1・2 PS版 配合検索（完全統合・全312種データ）</h1></header>
-
-    <div class="card">
-        <label>目標モンスターを選択</label>
-        <select id="targetSelect"></select>
-        <label>手持ちから開始（任意）</label>
-        <select id="startSelect"><option value="">-- 最初から --</option></select>
-        <button onclick="generateTree()">完全ルート検索</button>
+    <div class="wrapper">
+        <header><h1>👾 DQM1・2 PS版 配合シミュレーター</h1></header>
+        <div class="card">
+            <label>1. 目標モンスターの系統</label>
+            <select id="familySelect" onchange="updateTargetList()"><option value="">-- 読み込み中 --</option></select>
+            <label>2. 目標モンスター</label>
+            <select id="targetSelect" disabled onchange="updateStartList()"><option value="">-- 系統を選んでください --</option></select>
+            <label>3. 手持ちモンスターから開始 (関連種のみ)</label>
+            <select id="startSelect" disabled><option value="">-- 最初から計算 --</option></select>
+            <button onclick="generateTree()">完全ルート解析実行</button>
+        </div>
+        <div id="resultCard" class="card" style="display:none;"><div id="output"></div></div>
     </div>
-
-    <div id="resultCard" class="card" style="display:none;">
-        <div id="output"></div>
-    </div>
-</div>
 
 <script>
-// --- PS版 全312種 系統別全数リスト ---
-const familyFullLists = {
-    "スライム系": ["スライム","スライムベス","ホイミスライム","バブルスライム","スラッピー","スライムファング","スライムナイト","ストーンスライム","ドラゴスライム","スライムつむり","スライムボーグ","スライムツリー","ボックススライム","はねスライム","ぶちスライム","ぶちキング","キングスライム","メタルスライム","はぐれメタル","メタルキング","ゴールデンスライム","エンゼルスライム","トロピカルスライム","パールスライム","ピエロスライム","グランスライム","ワンダーエッグ","マリンスライム"],
-    "ドラゴン系": ["ドラゴンキッズ","コドラ","とさかへび","リザードフライ","ポイズンリザード","フーセンドラゴン","フェアリードラゴン","ウィングスネーク","ガメゴン","プテラノドン","リザードマン","ソードドラゴン","ドラゴンマッド","アンドレアル","キングコブラ","ライバーン","へびこうもり","おおイグアナ","デンタザウルス","バトルレックス","グレイトドラゴン","スカイドラゴン","やまたのおろち","しんりゅう","ギガントドラゴン","ドライゴン","オリハルゴン","コアトル","バピラス","じゃりゅうせんし","テラノザース","コモドドラゴン"],
-    "けもの系": ["アントベア","アルミラージ","ミノーン","ふにゃむにゃ","ベロゴン","ファーラット","キラースコップ","キャットフライ","スカルガルー","おおきづち","ももんじゃ","フェアリーラット","キラーエイプ","ゴートドン","イエティ","スーパーテンツク","アイアンタートル","ストロングアニマル","グリズリー","ビックアイ","パオーム","キラーパンサー","ユニコーン","キングレオ","ダークホーン","ヘルゴラゴ","よるのていおう","けもののきし","ビーバーン","オーク","トドマン","ダンビラムーチョ","ねこまどう","かくとうパンサー"],
-    "とり系": ["ドラキー","ピッキー","ハナカワセミ","おおにわとり","あばれうしどり","ダックカイト","デッドペッカー","デスフラッター","ミストウイング","キメラ","モーザ","ガンコどり","ファンキーバード","キラーグース","ヘルコンドル","ロックちょう","サンダーバード","ひくいどり","ホークブリザード","にじくじゃく","アクアマリンホーク","いわとびあくま","ウイングアサシン","エミュー","よなくにどり","シャンタク","キングアズライル","やたがらす"],
-    "植物系": ["マッドプラント","ふゆうじゅ","ガップリン","マタンゴ","きりかぶおばけ","オニオーン","サボテンボール","コハクそう","はなまどう","かりゅうそう","ダンスキャロット","ヘルボックル","ビーンファイター","エビルシード","じんめんじゅ","マンイーター","ひとくいそう","マンドラゴラ","ローズバトラー","エグドラシル","デビルパイン","ナスビナーラ","エビルポスト","プチヒーロー"],
-    "虫系": ["おおなめくじ","キャタピラー","ぐんたいアリ","じんめんちょう","せみもぐら","キリキリバッタ","テールイーター","よろいムカデ","メーダ","デスファレーナ","ドロル","ぐんたいガニ","ヘルホーネット","はさみくわがた","ホーンビートル","さそりアーマー","ダンジョンえび","キラーシックル","カマキリせんし","ピューロ","マルチアイ","スカルスパイダー"],
-    "あくま系": ["ピクシー","アークデーモン","ベビーサタン","グレムリン","ダークアイ","おおめだま","スカルライダー","ヘルビースト","メドーサボール","あくまのきし","きりさきピエロ","ギガンテス","アンクルホーン","じごくのもんばん","ずしおうまる","ボストロール","ライオネック","オーガー","アクバー","ジャミラス","デュラン","バブルデーモン","ひとつめピエロ","エビルワンド","ベルザブル","グレンデル","デーモンレスラー","レッドバロン","あくまのカガミ"],
-    "ゾンビ系": ["ゴースト","マッドロン","くさったしたい","がいこつけんし","しりょうのきし","スカルゴン","ボーンプリズナー","しにがみきぞく","マミー","ナイトウイプス","しにがみ","エビルスピリッツ","ワイトキング","まおうのつかい","ラザマナス","ゆうれいせんちょう","ナイトリッチ","さかさゾンビ","フィアーパペット","ダーククラブ","ポムポムボム","スカルサーペント"],
-    "物質系": ["わらいぶくろ","おどるほうせき","マドハンド","どろにんぎょう","ゴーレム","うごくせきぞう","ばくだんいわ","ミステリドール","ひとくいばこ","ミミック","メタルドラゴン","キラーマシン","キラーマシン2","プロトキラー","ひょうがまじん","ようがんまじん","ゴールデンゴーレム","デスソーサー","のろいのランプ","ギズモ","とげぼうず","ネジまきどり","ばくだんベビー","ダークマター","あくまのつぼ","トーテムキラー","おばけキャンドル","さまようよろい","ブラシこぞう"],
-    "水系": ["プチアーノン","たまてがい","ガマニアン","とつげきうお","ヘルパイレーツ","アックスシャーク","イカずきん","ホエールマージ","だいおうイカ","ダゴン","グラコス","ポセイドン","アクアパラソル","イルカちょうちん","エビルアングラー","おおうつぼ","オクトリーチ","おばけヒトデ","キラーウェーブ","クラブマン","シーホース","しんかいりゅう","たこつぼこぞう","ディゴング","フィッシュライダー","マータイガー","マッドロブスター"]
-};
+let monsterFamilies = {};
+let fusionRecipes = {};
 
-// --- 全配合マスターDB (3サイト統合) ---
-const dqmMasterDb = {
-    // ？？？？系
-    "ダークドレアム": ["デスタムーア(最終形態)", "わたぼう"],
-    "デスタムーア(最終形態)": ["デスタムーア(変身形態)", "ムドー"],
-    "デスタムーア(変身形態)": ["デスタムーア", "さそりアーマー"],
-    "デスタムーア": ["ミルドラース", "さそりアーマー"],
-    "ミルドラース": ["エスターク", "ゴールデンスライム"],
-    "エスターク": ["デスピサロ", "キングレオ"],
-    "デスピサロ": ["デュラン", "しんりゅう"],
-    "ゾーマ": ["りゅうおう", "シドー"],
-    "シドー": ["ジャミラス", "ローズバトラー"],
-    "バラモス": ["ハーゴン", "やまたのおろち"],
-    "ハーゴン": ["ワイトキング", "メタルキング"],
-    "りゅうおう": ["ドラゴン系", "まおうのつかい"],
-    "ムドー": ["ブースカ", "オルゴ・デミーラ"],
-    "オルゴ・デミーラ": ["しんりゅう", "ナイトリッチ"],
-
-    // スライム系 特殊
-    "グランスライム": ["ゴールデンスライム", "ゴールデンスライム"],
-    "ゴールデンスライム": ["メタルキング", "メタルキング"],
-    "メタルキング": ["ぶちキング", "メタルドラゴン"],
-    "ぶちキング": ["キングスライム", "メタルキング"],
-    "キングスライム": ["スライム系", "？？？？系"],
-    "はぐれメタル": ["メタルスライム", "メタルスライム"],
-    "メタルスライム": ["スライム系", "メタルドラゴン"],
-    "エンゼルスライム": ["スライム", "マネマネ"],
-
-    // ドラゴン系 特殊
-    "しんりゅう": ["スカイドラゴン", "やまたのおろち"],
-    "やまたのおろち": ["アンドレアル", "グレイトドラゴン"],
-    "グレイトドラゴン": ["ドラゴン系", "キングスライム"],
-    "スカイドラゴン": ["ドラゴン系", "ひくいどり"],
-    "ギガントドラゴン": ["グレイトドラゴン", "ギガンテス"],
-    "オリハルゴン": ["しんりゅう", "ギガントドラゴン"],
-
-    // けもの系 特殊
-    "キングレオ": ["パオーム", "パオーム"],
-    "パオーム": ["キラーエイプ", "キラーエイプ"],
-    "ヘルゴラゴ": ["ダークホーン", "やまたのおろち"],
-    "ダークホーン": ["けもの系", "？？？？系"],
-
-    // とり系 特殊
-    "にじくじゃく": ["ひくいどり", "ホークブリザード"],
-    "ひくいどり": ["とり系", "ドラゴスライム"],
-    "ホークブリザード": ["とり系", "メタルスライム"],
-    "キングアズライル": ["シャンタク", "にじくじゃく"],
-
-    // 他系統 特殊
-    "ローズバトラー": ["植物系", "？？？？系"],
-    "エグドラシル": ["ローズバトラー", "ギガンテス"],
-    "さそりアーマー": ["ホーンビートル", "ホーンビートル"],
-    "ホーンビートル": ["はさみくわがた", "はさみくわがた"],
-    "デュラン": ["ずしおうまる", "ゴールデンゴーレム"],
-    "ジャミラス": ["アクバー", "にじくじゃく"],
-    "ゴールデンゴーレム": ["ひょうがまじん", "ようがんまじん"],
-    "ワイトキング": ["ゾンビ系", "？？？？系"],
-    "まおうのつかい": ["がいこつけんし", "がいこつけんし"],
-    "グラコス": ["水系", "？？？？系"],
-    "ダークマター": ["物質系", "？？？？系"]
-};
-
-// --- 系統配合テーブル (全10系統×10系統) ---
-const familyRecipes = {
-    "スライム系": {"ドラゴン系":"ドラゴスライム", "けもの系":"ぶちスライム", "とり系":"はねスライム", "植物系":"スライムツリー", "むし系":"スライムつむり", "あくま系":"スライムナイト", "ゾンビ系":"バブルスライム", "物質系":"ボックススライム", "水系":"パールスライム"},
-    "ドラゴン系": {"スライム系":"ドラゴンキッズ", "けもの系":"ガメゴン", "とり系":"プテラノドン", "植物系":"フーセンドラゴン", "むし系":"フェアリードラゴン", "あくま系":"リザードマン", "ゾンビ系":"ポイズンリザード", "物質系":"ソードドラゴン", "水系":"ドライゴン"},
-    "けもの系": {"スライム系":"ベロゴン", "ドラゴン系":"アルミラージ", "とり系":"キャットフライ", "植物系":"ファーラット", "むし系":"ミノーン", "あくま系":"グリズリー", "ゾンビ系":"スカルガルー", "物質系":"かまいたち", "水系":"ビーバーン"},
-    "とり系": {"スライム系":"ピッキー", "ドラゴン系":"キメラ", "けもの系":"あばれうしどり", "植物系":"ハナカワセミ", "むし系":"ダックカイト", "あくま系":"デッドペッカー", "ゾンビ系":"デスフラッター", "物質系":"ミストウイング", "水系":"アクアマリンホーク"},
-    "植物系": {"スライム系":"マッドプラント", "ドラゴン系":"かりゅうそう", "けもの系":"ハナマドウ", "とり系":"ふゆうじゅ", "むし系":"サボテンボール", "あくま系":"ガップリン", "ゾンビ系":"マタンゴ", "物質系":"コハクそう", "水系":"エビルソピタル"},
-    "虫系": {"スライム系":"おおなめくじ", "ドラゴン系":"キャタピラー", "けもの系":"せみもぐら", "とり系":"じんめんちょう", "植物系":"とうちゅうかそう", "あくま系":"おおみみず", "ゾンビ系":"リップス", "物質系":"はさみくわがた", "水系":"ガマニアン"},
-    "あくま系": {"スライム系":"ピクシー", "ドラゴン系":"メドーサボール", "けもの系":"グレムリン", "とり系":"ベビーサタン", "植物系":"ダークアイ", "むし系":"おおめだま", "ゾンビ系":"スカルライダー", "物質系":"ヘルビースト", "水系":"クラブマン"},
-    "ゾンビ系": {"スライム系":"ゴースト", "ドラゴン系":"スカルサーペント", "けもの系":"くさったしたい", "とり系":"やたがらす", "植物系":"マミー", "むし系":"ダーククラブ", "あくま系":"しりょうのきし", "物質系":"シャドー", "水系":"ゆうれいせんちょう"},
-    "物質系": {"スライム系":"おどるほうせき", "ドラゴン系":"エビルワンド", "けもの系":"おばけキャンドル", "とり系":"ネジまきどり", "植物系":"トーテムキラー", "むし系":"とげぼうず", "あくま系":"あくまのカガミ", "ゾンビ系":"さまようよろい", "水系":"ブラシこぞう"},
-    "水系": {"スライム系":"マリンスライム", "ドラゴン系":"おおうつぼ", "けもの系":"トドマン", "とり系":"イルカちょうちん", "植物系":"ナスビナーラ", "むし系":"アクアパラソル", "あくま系":"たこつぼこぞう", "ゾンビ系":"マッドロブスター", "物質系":"エビルアングラー"}
-};
-
-// リバースエンジニアリングで系統配合の全逆引きを生成
-for (let f1 in familyRecipes) {
-    for (let f2 in familyRecipes[f1]) {
-        let res = familyRecipes[f1][f2];
-        if (!dqmMasterDb[res]) dqmMasterDb[res] = [f1, f2];
+// GitHub上のJSONを読み込む想定（ローカルテスト時はファイルを同ディレクトリに置く）
+async function loadData() {
+    try {
+        const resFam = await fetch('family_list.json');
+        const resFus = await fetch('fusion_list.json');
+        monsterFamilies = await resFam.json();
+        fusionRecipes = await resFus.json();
+        
+        const fSel = document.getElementById('familySelect');
+        fSel.innerHTML = '<option value="">-- 系統を選択 --</option>';
+        Object.keys(monsterFamilies).forEach(f => fSel.add(new Option(f, f)));
+    } catch (e) {
+        alert("JSONデータの読み込みに失敗しました。GitHubのパスを確認してください。");
     }
 }
 
-// 初期化
-const targetSel = document.getElementById('targetSelect');
-const startSel = document.getElementById('startSelect');
-const allNames = Array.from(new Set([...Object.keys(dqmMasterDb), ...Object.keys(familyFullLists)])).sort();
+function updateTargetList() {
+    const tSel = document.getElementById('targetSelect');
+    const family = document.getElementById('familySelect').value;
+    tSel.innerHTML = '<option value="">-- モンスターを選択 --</option>';
+    if (family) {
+        monsterFamilies[family].forEach(m => tSel.add(new Option(m, m)));
+        tSel.disabled = false;
+    } else {
+        tSel.disabled = true;
+    }
+    updateStartList();
+}
 
-allNames.forEach(n => {
-    targetSel.add(new Option(n, n));
-    startSel.add(new Option(n, n));
-});
+function updateStartList() {
+    const sSel = document.getElementById('startSelect');
+    const target = document.getElementById('targetSelect').value;
+    sSel.innerHTML = '<option value="">-- 最初から計算 --</option>';
+    if (!target) { sSel.disabled = true; return; }
+
+    const related = new Set();
+    function collect(m) {
+        const routes = fusionRecipes.recipes[m];
+        if (!routes) return;
+        routes.forEach(route => {
+            route.forEach(p => {
+                if (!related.has(p)) { related.add(p); collect(p); }
+            });
+        });
+    }
+    collect(target);
+    Array.from(related).sort().forEach(m => sSel.add(new Option(m, m)));
+    sSel.disabled = false;
+}
 
 function generateTree() {
-    const target = targetSel.value;
-    const start = startSel.value;
+    const target = document.getElementById('targetSelect').value;
+    const start = document.getElementById('startSelect').value;
     const output = document.getElementById('output');
     document.getElementById('resultCard').style.display = 'block';
-    
+
+    if (!target) return;
+    if (!fusionRecipes.recipes[target] && target !== start) {
+        output.innerHTML = `<span class="error">「${target}」の配合ルートがありません。\n(野生での捕獲、または系統配合の末端です)</span>`;
+        return;
+    }
+
     let summary = {};
-    let usedFamilies = new Set();
+    let activeFamilies = new Set();
 
     function build(name, depth = 0) {
-        if (name === start && start !== "") {
-            return `<span style="color:#fb7185">★手持ち[${name}]から開始</span>\n`;
-        }
-        if (!dqmMasterDb[name]) {
+        if (name === start && start !== "") return `<span style="color:#fb7185">★所持[${name}]</span>\n`;
+        const routes = fusionRecipes.recipes[name];
+        if (!routes) {
             summary[name] = (summary[name] || 0) + 1;
-            if (familyFullLists[name]) usedFamilies.add(name);
+            // 系統名だった場合、全数リスト表示フラグを立てる
+            for(let f in monsterFamilies) if(f === name) activeFamilies.add(f);
             return `<span style="color:#94a3b8">${name}</span>\n`;
         }
-
-        const [p1, p2] = dqmMasterDb[name];
+        const [p1, p2] = routes[0]; // 複数ある場合は第1候補を表示
         const indent = "  ".repeat(depth);
-        let res = `<span style="color:#38bdf8">${name}</span>\n`;
-        res += `${indent}┣ ${build(p1, depth + 1)}`;
-        res += `${indent}┗ ${build(p2, depth + 1)}`;
+        let res = `<span style="color:#38bdf8">${name}</span>${routes.length > 1 ? ' (別レシピあり)' : ''}\n`;
+        res += `${indent}┣ ${build(p1, depth + 1)}${indent}┗ ${build(p2, depth + 1)}`;
         return res;
     }
 
-    let treeHTML = build(target);
-    
-    let familyHTML = "";
-    if (usedFamilies.size > 0) {
-        familyHTML += "\n<span style='color:#f472b6; font-weight:bold;'>【素材となる系統の全モンスターリスト】</span>\n";
-        usedFamilies.forEach(f => {
-            familyHTML += `<span style="color:#f472b6">${f}</span>: ${familyFullLists[f].join(", ")}\n`;
-        });
-    }
-
-    let sumHTML = "<span class='summary-total'>【最終的な必要素材数】</span>\n";
-    for (const [m, c] of Object.entries(summary)) {
-        sumHTML += `${m} × ${c}\n`;
-    }
-    
-    output.innerHTML = treeHTML + familyHTML + sumHTML;
+    let html = build(target);
+    let famHTML = "";
+    activeFamilies.forEach(f => {
+        famHTML += `\n<div class="family-info"><b style="color:#f472b6">${f}の全モンスター:</b>\n${monsterFamilies[f].join(", ")}</div>`;
+    });
+    output.innerHTML = html + famHTML + `\n\n<b style="color:#fbbf24">【必要素材合計】</b>\n` + 
+        Object.entries(summary).map(([m, c]) => `${m} × ${c}`).join("\n");
 }
+
+loadData();
 </script>
 </body>
 </html>
