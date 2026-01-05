@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DQM1・2 PS版 配合シミュレーター</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f4f7f6; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--primary); margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1, h2 { text-align: center; color: var(--primary); }
+        .flex-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; }
+        .input-group { flex: 1; min-width: 250px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.9em; }
+        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; background: #fff; }
+        button { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+        button:hover { background: #2980b9; }
+        #output { white-space: pre-wrap; background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; line-height: 1.5; font-size: 14px; overflow-x: auto; }
+        .summary { margin-top: 20px; border-top: 1px dashed #7f8c8d; padding-top: 10px; color: #f1c40f; }
+        .recipe-line { color: #3498db; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>👾 DQM1・2 PS版 配合検索</h1>
+    
+    <div class="card">
+        <div class="flex-row">
+            <div class="input-group">
+                <label>最終的に作りたいモンスター</label>
+                <select id="targetSelect"></select>
+            </div>
+            <div class="input-group">
+                <label>手持ちから開始（任意）</label>
+                <select id="startSelect">
+                    <option value="">-- 最初から計算 --</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="runSearch()">配合ルートを作成する</button>
+    </div>
+
+    <div id="resultCard" class="card" style="display:none;">
+        <h2>📋 配合手順・必要素材</h2>
+        <div id="output"></div>
+    </div>
+</div>
+
+<script>
+// --- 3サイト統合配合データベース ---
+// 形式: "モンスター名": ["血統", "相手"]
+const dqmData = {
+    // ？？？？系（魔王）
+    "ダークドレアム": ["デスタムーア(最終)", "わたぼう"],
+    "デスタムーア(最終)": ["デスタムーア(変身)", "ムドー"],
+    "デスタムーア(変身)": ["デスタムーア", "さそりアーマー"],
+    "デスタムーア": ["ミルドラース", "さそりアーマー"],
+    "ミルドラース": ["エスターク", "ゴールデンスライム"],
+    "エスターク": ["デスピサロ", "キングレオ"],
+    "デスピサロ": ["デュラン", "しんりゅう"],
+    "ゾーマ": ["りゅうおう", "シドー"],
+    "シドー": ["ジャミラス", "ローズバトラー"],
+    "りゅうおう": ["ドラゴン系", "まおうのつかい"],
+    "ハーゴン": ["ワイトキング", "メタルキング"],
+    "バラモス": ["ハーゴン", "やまたのおろち"],
+    
+    // スライム系
+    "グランスライム": ["ゴールデンスライム", "ゴールデンスライム"],
+    "ゴールデンスライム": ["メタルキング", "メタルキング"],
+    "メタルキング": ["ぶちキング", "メタルドラゴン"],
+    "ぶちキング": ["キングスライム", "メタルキング"],
+    "キングスライム": ["スライム系", "？？？？系"],
+    "はぐれメタル": ["メタルスライム", "メタルスライム"],
+    "メタルスライム": ["スライム系", "メタルドラゴン"],
+    
+    // ドラゴン系
+    "しんりゅう": ["スカイドラゴン", "やまたのおろち"],
+    "やまたのおろち": ["アンドレアル", "グレイトドラゴン"],
+    "グレイトドラゴン": ["ドラゴン系", "キングスライム"],
+    "アンドレアル": ["ドラゴン系", "ガップリン"],
+    "スカイドラゴン": ["ドラゴン系", "ひくいどり"],
+    "ギガントドラゴン": ["グレイトドラゴン", "ギガンテス"],
+    "オリハルゴン": ["しんりゅう", "ギガントドラゴン"],
+
+    // その他重要モンスター
+    "にじくじゃく": ["ひくいどり", "ホークブリザード"],
+    "ひくいどり": ["とり系", "ドラゴスライム"],
+    "ホークブリザード": ["とり系", "メタルスライム"],
+    "ドラゴスライム": ["スライム系", "ドラゴン系"],
+    "ローズバトラー": ["しょくぶつ系", "？？？？系"],
+    "ジャミラス": ["アクバー", "にじくじゃく"],
+    "デュラン": ["ずしおうまる", "ゴールデンゴーレム"],
+    "ゴールデンゴーレム": ["ひょうがまじん", "ようがんまじん"],
+    "まおうのつかい": ["がいこつけんし", "がいこつけんし"],
+    "ワイトキング": ["しにがみきぞく", "ぶちキング"],
+    "さそりアーマー": ["ホーンビートル", "ホーンビートル"],
+    "ホーンビートル": ["はさみくわがた", "はさみくわがた"],
+    "ムドー": ["ブースカ", "オルゴ・デミーラ"]
+};
+
+// リストの初期化
+const allMonsters = Array.from(new Set([...Object.keys(dqmData), ...Object.values(dqmData).flat()]));
+allMonsters.sort();
+const targetSelect = document.getElementById('targetSelect');
+const startSelect = document.getElementById('startSelect');
+
+allMonsters.forEach(m => {
+    targetSelect.add(new Option(m, m));
+    startSelect.add(new Option(m, m));
+});
+
+function runSearch() {
+    const target = targetSelect.value;
+    const start = startSelect.value;
+    const resultCard = document.getElementById('resultCard');
+    const output = document.getElementById('output');
+    
+    resultCard.style.display = 'block';
+    let summary = {};
+    let steps = [];
+
+    function getRecipe(monster, depth = 0) {
+        if (monster === start && start !== "") {
+            return " [ " + monster + " ] ★手持ちから開始\n";
+        }
+        if (!dqmData[monster]) {
+            summary[monster] = (summary[monster] || 0) + 1;
+            return " ( " + monster + " ) ※野生・基本系統\n";
+        }
+
+        const [p1, p2] = dqmData[monster];
+        let res = " ▼ " + monster + " を作成\n";
+        res += "  ".repeat(depth + 1) + "├─ " + getRecipe(p1, depth + 1);
+        res += "  ".repeat(depth + 1) + "└─ " + getRecipe(p2, depth + 1);
+        return res;
+    }
+
+    const recipeFlow = getRecipe(target);
+    
+    let resultHTML = recipeFlow;
+    resultHTML += "\n-------------------------------------\n";
+    resultHTML += "【最終的に集めるモンスター合計】\n";
+    for (let m in summary) {
+        resultHTML += `${m} × ${summary[m]}\n`;
+    }
+
+    output.innerText = resultHTML;
+}
+</script>
+
+</body>
+</html>
